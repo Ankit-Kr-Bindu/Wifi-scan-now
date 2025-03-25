@@ -1,58 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Network from 'expo-network';
-import NetInfo from '@react-native-community/netinfo';
-import WifiStrengthGauge from '../components/WifiStrengthGauge';
-
-interface WifiDetails {
-  strength?: number;
-  ssid?: string;
-}
-
-interface WifiInfo {
-  isConnected: boolean;
-  type: string;
-  isInternetReachable: boolean | null;
-  strength?: number;
-  ssid?: string;
-  ipAddress?: string;
-}
+import { NetworkCard } from './components/wifi/NetworkCard';
+import { fetchWifiInfo } from './services/wifiService';
+import { WifiInfo } from './types/wifi';
 
 export default function WifiInfoScreen() {
   const [wifiInfo, setWifiInfo] = useState<WifiInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  const fetchWifiInfo = async () => {
+  const handleFetchWifiInfo = async () => {
     setLoading(true);
     try {
-      const [networkState, netInfo, ipAddress] = await Promise.all([
-        Network.getNetworkStateAsync(),
-        NetInfo.fetch(),
-        Network.getIpAddressAsync()
-      ]);
-
-      const details = netInfo.details as WifiDetails;
-      setWifiInfo({
-        isConnected: networkState.isConnected ?? false,
-        type: networkState.type ?? 'unknown',
-        isInternetReachable: networkState.isInternetReachable ?? null,
-        strength: details?.strength,
-        ssid: details?.ssid ?? 'Unknown',
-        ipAddress: ipAddress
-      });
+      const info = await fetchWifiInfo();
+      setWifiInfo(info);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching info:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchWifiInfo();
-    const interval = setInterval(fetchWifiInfo, 5000);
-    return () => clearInterval(interval);
+    handleFetchWifiInfo();
   }, []);
 
   return (
@@ -61,7 +31,7 @@ export default function WifiInfoScreen() {
         <Text style={styles.headerTitle}>WiFi Status</Text>
         <TouchableOpacity 
           style={styles.refreshButton} 
-          onPress={fetchWifiInfo}
+          onPress={handleFetchWifiInfo}
           disabled={loading}
         >
           <MaterialCommunityIcons 
@@ -82,45 +52,7 @@ export default function WifiInfoScreen() {
             <Text style={styles.loadingText}>Scanning network...</Text>
           </View>
         ) : wifiInfo ? (
-          <>
-            <View style={styles.card}>
-              <View style={styles.networkHeader}>
-                <MaterialCommunityIcons 
-                  name={wifiInfo.isConnected ? "wifi" : "wifi-off"} 
-                  size={32} 
-                  color={wifiInfo.isConnected ? "#4CAF50" : "#F44336"} 
-                />
-                <Text style={styles.ssid}>{wifiInfo.ssid || 'Unknown Network'}</Text>
-              </View>
-              
-              <WifiStrengthGauge strength={wifiInfo.strength} />
-
-              <View style={styles.infoGrid}>
-                <InfoItem 
-                  icon="wifi-strength-4" 
-                  label="Type" 
-                  value={wifiInfo.type} 
-                />
-                <InfoItem 
-                  icon="connection" 
-                  label="Status" 
-                  value={wifiInfo.isConnected ? 'Connected' : 'Disconnected'} 
-                  valueColor={wifiInfo.isConnected ? '#4CAF50' : '#F44336'}
-                />
-                <InfoItem 
-                  icon="web" 
-                  label="Internet" 
-                  value={wifiInfo.isInternetReachable ? 'Available' : 'Unavailable'} 
-                  valueColor={wifiInfo.isInternetReachable ? '#4CAF50' : '#F44336'}
-                />
-                <InfoItem 
-                  icon="ip-network" 
-                  label="IP Address" 
-                  value={wifiInfo.ipAddress || 'Unknown'} 
-                />
-              </View>
-            </View>
-          </>
+          <NetworkCard wifiInfo={wifiInfo} />
         ) : (
           <View style={styles.errorContainer}>
             <MaterialCommunityIcons name="wifi-alert" size={48} color="#F44336" />
@@ -131,21 +63,6 @@ export default function WifiInfoScreen() {
     </View>
   );
 }
-
-interface InfoItemProps {
-  icon: string;
-  label: string;
-  value: string;
-  valueColor?: string;
-}
-
-const InfoItem = ({ icon, label, value, valueColor = '#000' }: InfoItemProps) => (
-  <View style={styles.infoItem}>
-    <MaterialCommunityIcons name={icon as any} size={24} color="#666" />
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={[styles.infoValue, { color: valueColor }]}>{value}</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
@@ -171,47 +88,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-  },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  networkHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  ssid: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginLeft: 12,
-    color: '#000',
-  },
-  infoGrid: {
-    marginTop: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginLeft: 12,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
